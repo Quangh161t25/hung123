@@ -239,9 +239,9 @@
 
         .modal-content {
             background: #fff;
-            width: 100%;
-            max-width: 650px;
-            max-height: 90vh;
+            width: 98%;
+            max-width: 1600px;
+            max-height: 95vh;
             border-radius: 20px;
             display: flex;
             flex-direction: column;
@@ -249,7 +249,7 @@
         }
 
         .modal-header {
-            padding: 1.5rem 2rem;
+            padding: 1rem 1.5rem;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
@@ -257,13 +257,13 @@
         }
 
         .modal-body {
-            padding: 2rem;
+            padding: 1.5rem;
             overflow-y: auto;
             flex: 1;
         }
 
         .modal-footer {
-            padding: 1.5rem 2rem;
+            padding: 1rem 1.5rem;
             border-top: 1px solid var(--border);
             display: flex;
             justify-content: flex-end;
@@ -271,7 +271,7 @@
         }
 
         .edit-form-group {
-            margin-bottom: 1.25rem;
+            margin-bottom: 1rem;
         }
 
         .edit-form-group label {
@@ -285,11 +285,12 @@
         /* History Modal Styles */
         .history-section {
             display: none;
-            padding: 1.5rem;
+            padding: 1rem;
             background: #f8fafc;
             border-top: 1px solid var(--border);
-            max-height: 350px;
+            max-height: 400px;
             overflow-y: auto;
+            overflow-x: auto;
         }
 
         .history-item {
@@ -300,6 +301,92 @@
             margin-bottom: 10px;
             font-size: 0.85rem;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            overflow-x: auto;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            table-layout: auto;
+        }
+
+        .history-table th {
+            background: #f1f5f9;
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 700;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .history-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        .history-table tr:hover {
+            background: #f8fafc;
+        }
+
+        .diff-changed {
+            color: #e11d48;
+            font-weight: 800;
+            background: #fff1f2;
+        }
+
+        /* Summary Bar */
+        .summary-container {
+            margin-bottom: 20px;
+            background: #fff;
+            padding: 1.25rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .summary-table th {
+            text-align: left;
+            color: #64748b;
+            font-weight: 700;
+            padding: 5px 15px;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .summary-table td {
+            padding: 5px 15px;
+            font-weight: 800;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .summary-table tr:first-child th,
+        .summary-table tr:first-child td {
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .summary-table tr:last-child th,
+        .summary-table tr:last-child td {
+            padding-top: 10px;
+        }
+
+        .summary-table .highlight {
+            color: #10b981;
         }
 
         .history-item-header {
@@ -499,6 +586,36 @@
             </div>
         </div>
 
+        <div class="summary-container">
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th style="width: 200px;">Summary</th>
+                        <th>Treys Payments</th>
+                        <th>Bills Payments</th>
+                        <th>Total Costs</th>
+                        <th>Estimated</th>
+                    </tr>
+                </thead>
+                <tbody id="summaryTableBody">
+                    <tr>
+                        <th>Total:</th>
+                        <td id="tot-trey">$0,00</td>
+                        <td id="tot-bill">$0,00</td>
+                        <td id="tot-cost">$0,00</td>
+                        <td id="tot-est">$0,00</td>
+                    </tr>
+                    <tr>
+                        <th class="highlight">Total Build Cost:</th>
+                        <td id="tbc-trey" class="highlight">$0,00</td>
+                        <td id="tbc-bill" class="highlight">$0,00</td>
+                        <td id="tbc-cost" class="highlight">$0,00</td>
+                        <td id="tbc-est" class="highlight">$0,00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
         <div class="table-wrapper" id="tableWrapper">
             <table id="dataTable">
                 <thead id="tableHead"></thead>
@@ -582,6 +699,7 @@ sR2Sh8e3h3Knd6j1tceRIFU=
                     filteredData = [...allData];
                     renderHeaders();
                     renderTable();
+                    updateSummary();
                 } catch (e) {
                     alert("Error loading data. Please check your connection.");
                 } finally {
@@ -623,7 +741,76 @@ sR2Sh8e3h3Knd6j1tceRIFU=
             }
 
             function changePage(delta) { currentPage += delta; renderTable(); }
-            function filterTable() { const v = document.getElementById('searchInput').value.toLowerCase(); filteredData = allData.filter(r => r.some(c => String(c).toLowerCase().includes(v))); currentPage = 1; renderTable(); }
+            function filterTable() {
+                const v = document.getElementById('searchInput').value.toLowerCase();
+                filteredData = allData.filter(r => r.some(c => String(c).toLowerCase().includes(v)));
+                currentPage = 1;
+                renderTable();
+                updateSummary();
+            }
+
+            function parseCurrency(val) {
+                if (!val) return 0;
+                // Format: $3.753,98 -> 3753.98
+                let s = String(val).replace('$', '').trim();
+                s = s.split('.').join(''); // Remove thousand dots
+                s = s.replace(',', '.'); // Change decimal comma to dot
+                return parseFloat(s) || 0;
+            }
+
+            function formatCurrency(val) {
+                const parts = val.toFixed(2).split('.');
+                parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                return `$${parts[0]},${parts[1]}`;
+            }
+
+            function updateSummary() {
+                const totalItemsList = [
+                    "Plans, Demo, Survey", "Permits", "Trash / Site Maintenace", "Piling/Foundation / Masonary",
+                    "Frame Material & Labor", "Roof & Floor Trusses", "Interior Stairs", "Windows / Sliding Glass Doors",
+                    "Electrical", "Lighting Fixtures / Ceiling Fans", "Plumbing", "Plumbing Fixtures, & Tubs",
+                    "HVAC", "Stucco / Siding / Stone veneer", "Insulation", "Soffit and Ceilings", "Roof", "Drywall",
+                    "Interior Doors & Front Door", "Garage Doors", "Interior / Exterior Paint", "Decks & Railings",
+                    "Elevator", "Door Hardware & Closet Shelving", "Trimwork", "Cabinets", "Counter Tops",
+                    "Appliances & Fireplace", "Gas Service and Water Heaters", "Tile & Stone", "Shower Doors and Mirrors",
+                    "Wood Floor", "Garage Floor", "Landscape and Sod", "Wall and Gates", "Patio / Driveway",
+                    "Final Clean", "Punchout", "Pool", "Dock", "Misc."
+                ];
+
+                const extraBuildCostItems = [
+                    "Trey", "Lot Purchase Cost", "Taxes", "Utlilties /Insurance"
+                ];
+
+                const cols = {
+                    "trey": { label: "Treys Payments", total: 0, extra: 0, elTot: 'tot-trey', elTbc: 'tbc-trey' },
+                    "bill": { label: "Bills Payments", total: 0, extra: 0, elTot: 'tot-bill', elTbc: 'tbc-bill' },
+                    "cost": { label: "Total Costs", total: 0, extra: 0, elTot: 'tot-cost', elTbc: 'tbc-cost' },
+                    "est": { label: "Estimated", total: 0, extra: 0, elTot: 'tot-est', elTbc: 'tbc-est' }
+                };
+
+                Object.keys(cols).forEach(k => {
+                    const idx = allHeaders.indexOf(cols[k].label);
+                    cols[k].idx = idx;
+                });
+
+                allData.forEach(row => {
+                    const itemName = String(row[0]).trim();
+                    Object.keys(cols).forEach(k => {
+                        if (cols[k].idx === -1) return;
+                        const val = parseCurrency(row[cols[k].idx]);
+                        if (totalItemsList.includes(itemName)) {
+                            cols[k].total += val;
+                        } else if (extraBuildCostItems.includes(itemName)) {
+                            cols[k].extra += val;
+                        }
+                    });
+                });
+
+                Object.keys(cols).forEach(k => {
+                    document.getElementById(cols[k].elTot).innerText = formatCurrency(cols[k].total);
+                    document.getElementById(cols[k].elTbc).innerText = formatCurrency(cols[k].total + cols[k].extra);
+                });
+            }
 
             function openEditModal(sheetRow) {
                 editingRowIndex = sheetRow;
@@ -673,12 +860,44 @@ sR2Sh8e3h3Knd6j1tceRIFU=
                     const data = await res.json();
                     const logs = (data.values || []).filter(h => h[3] === currentTab && parseInt(h[4]) === editingRowIndex).reverse();
                     if (!logs.length) { el.innerHTML = '<p style="text-align:center;padding:20px;">No history found.</p>'; return; }
-                    el.innerHTML = logs.map(h => `
-                        <div class="history-item">
-                            <div class="history-item-header"><span>${h[0]} - ${h[1]} (${h[2]})</span><button class="btn-restore" onclick='restoreState(${h[6]})'>Restore</button></div>
-                            <div style="color:#64748b;font-size:0.7rem;word-break:break-all;">Data: ${h[6]}</div>
-                        </div>`).join('');
-                } catch (e) { el.innerHTML = 'Error loading history.'; }
+
+                    let tableHtml = `
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    ${allHeaders.map(h => `<th>${h}</th>`).join('')}
+                                    <th>Restore</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    tableHtml += logs.map(h => {
+                        const oldRow = JSON.parse(h[5] || '[]');
+                        const newRow = JSON.parse(h[6] || '[]');
+
+                        const dataCells = allHeaders.map((_, i) => {
+                            const isChanged = oldRow[i] !== newRow[i];
+                            return `<td class="${isChanged ? 'diff-changed' : ''}" title="${newRow[i] ?? ''}">${newRow[i] ?? ''}</td>`;
+                        }).join('');
+
+                        return `
+                            <tr>
+                                <td>${h[0]}</td>
+                                <td>${h[1]}</td>
+                                <td>${h[2]}</td>
+                                ${dataCells}
+                                <td><button class="btn-restore" onclick='restoreState(${h[6]})'>Restore</button></td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    tableHtml += `</tbody></table>`;
+                    el.innerHTML = tableHtml;
+                } catch (e) { console.error(e); el.innerHTML = 'Error loading history.'; }
             }
 
             async function restoreState(data) {
