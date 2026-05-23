@@ -81,6 +81,35 @@
             color: #94a3b8;
         }
 
+        .module-tabs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 16px;
+        }
+
+        .module-btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            color: #475569;
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: 0.2s;
+        }
+
+        .module-btn:hover,
+        .module-btn.active {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #eef2ff;
+        }
+
         .table-wrapper {
             background: #fff;
             border-radius: 12px;
@@ -111,6 +140,11 @@
         td {
             padding: 10px 15px;
             border-bottom: 1px solid var(--border);
+        }
+
+        th.money-column,
+        td.money-column {
+            text-align: right;
         }
 
         tr:hover {
@@ -537,9 +571,9 @@
         <div id="editModal" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3 style="font-weight: 800; color: var(--primary); font-size: 1.25rem;">EDIT DATA</h3>
+                    <h3 id="editModalTitle" style="font-weight: 800; color: var(--primary); font-size: 1.25rem;">EDIT DATA</h3>
                     <div style="display:flex; align-items:center; gap:12px;">
-                        <button class="btn-view-history" onclick="toggleHistory()">View history</button>
+                        <button class="btn-view-history" id="viewHistoryBtn" onclick="toggleHistory()">View history</button>
                         <button onclick="closeEditModal()"
                             style="border:none; background:none; cursor:pointer; color:#94a3b8;">
                             <i data-lucide="x" style="width: 28px;"></i>
@@ -567,11 +601,22 @@
         <div class="header-container">
             <div style="display:flex; align-items:center;">
                 <h1 id="pageTitle">EXCEL WEB APP</h1>
+                <div class="module-tabs">
+                    <button id="dataModuleBtn" class="module-btn active" onclick="switchModule('data')">
+                        <i data-lucide="table-2" style="width:16px;"></i> Data
+                    </button>
+                    <button id="userModuleBtn" class="module-btn" onclick="switchModule('users')">
+                        <i data-lucide="users" style="width:16px;"></i> Users
+                    </button>
+                </div>
                 <div class="search-container">
                     <i data-lucide="search" class="search-icon"></i>
                     <input type="text" id="searchInput" class="search-input" placeholder="SEARCH..."
                         oninput="filterTable()">
                 </div>
+                <button id="addUserBtn" class="module-btn" onclick="openAddUserModal()" style="display:none;">
+                    <i data-lucide="plus" style="width:16px;"></i> Add
+                </button>
             </div>
 
             <div style="display:flex; align-items:center; gap:20px;">
@@ -586,7 +631,7 @@
             </div>
         </div>
 
-        <div class="summary-container">
+        <div class="summary-container" id="summaryContainer">
             <table class="summary-table">
                 <thead>
                     <tr>
@@ -595,6 +640,7 @@
                         <th>Bills Payments</th>
                         <th>Total Costs</th>
                         <th>Estimated</th>
+                        <th>Payments</th>
                     </tr>
                 </thead>
                 <tbody id="summaryTableBody">
@@ -604,6 +650,7 @@
                         <td id="tot-bill">$0,00</td>
                         <td id="tot-cost">$0,00</td>
                         <td id="tot-est">$0,00</td>
+                        <td id="tot-payments">$0,00</td>
                     </tr>
                     <tr>
                         <th class="highlight">Total Build Cost:</th>
@@ -611,6 +658,7 @@
                         <td id="tbc-bill" class="highlight">$0,00</td>
                         <td id="tbc-cost" class="highlight">$0,00</td>
                         <td id="tbc-est" class="highlight">$0,00</td>
+                        <td id="tbc-payments" class="highlight">$0,00</td>
                     </tr>
                 </tbody>
             </table>
@@ -660,7 +708,7 @@ sR2Sh8e3h3Knd6j1tceRIFU=
                 tokenUrl: "https://oauth2.googleapis.com/token",
                 tabs: {
                     'data': { range: 'data!A1:ZZ' },
-                    'ds_nv': { range: 'ds_nv!A1:D' },
+                    'users': { range: 'users!A1:D' },
                     'history': { range: 'history!A1:G' }
                 }
             };
@@ -668,6 +716,10 @@ sR2Sh8e3h3Knd6j1tceRIFU=
             let currentTab = 'data', allHeaders = [], allData = [], accessToken = null, tokenExpiry = 0;
             let currentPage = 1, rowsPerPage = 100, filteredData = [];
             let editingRowIndex = -1;
+            const moduleTitles = {
+                data: 'EXCEL WEB APP',
+                users: 'USER MODULE'
+            };
 
             async function getAccessToken() {
                 if (accessToken && Date.now() < tokenExpiry - 300000) return accessToken;
@@ -684,7 +736,7 @@ sR2Sh8e3h3Knd6j1tceRIFU=
                 document.getElementById('loading').style.display = 'flex';
                 try {
                     const token = await getAccessToken();
-                    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.spreadsheetId}/values/${CONFIG.tabs.data.range}`, { headers: { Authorization: `Bearer ${token}` } });
+                    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.spreadsheetId}/values/${CONFIG.tabs[currentTab].range}`, { headers: { Authorization: `Bearer ${token}` } });
                     const data = await res.json();
                     const rawRows = data.values || [];
 
@@ -695,11 +747,16 @@ sR2Sh8e3h3Knd6j1tceRIFU=
                             arr._sheetRow = i + 2;
                             return arr;
                         });
+                    } else {
+                        allHeaders = [];
+                        allData = [];
                     }
+                    currentPage = 1;
                     filteredData = [...allData];
+                    renderModuleState();
                     renderHeaders();
                     renderTable();
-                    updateSummary();
+                    if (currentTab === 'data') updateSummary();
                 } catch (e) {
                     alert("Error loading data. Please check your connection.");
                 } finally {
@@ -707,26 +764,72 @@ sR2Sh8e3h3Knd6j1tceRIFU=
                 }
             }
 
+            async function switchModule(tabName) {
+                if (!CONFIG.tabs[tabName] || currentTab === tabName) return;
+                if (tabName === 'users' && !isAdminUser()) {
+                    alert("You do not have permission to manage users.");
+                    return;
+                }
+                currentTab = tabName;
+                document.getElementById('searchInput').value = '';
+                await fetchData();
+            }
+
+            function renderModuleState() {
+                const isAdmin = isAdminUser();
+                document.getElementById('pageTitle').innerText = moduleTitles[currentTab] || 'EXCEL WEB APP';
+                document.getElementById('summaryContainer').style.display = currentTab === 'data' ? 'block' : 'none';
+                document.getElementById('dataModuleBtn').classList.toggle('active', currentTab === 'data');
+                document.getElementById('userModuleBtn').classList.toggle('active', currentTab === 'users');
+                document.getElementById('addUserBtn').style.display = isAdmin && currentTab === 'users' ? 'flex' : 'none';
+            }
+
+            function applyUserPermissions() {
+                const isAdmin = isAdminUser();
+                document.getElementById('userModuleBtn').style.display = isAdmin ? 'flex' : 'none';
+                if (!isAdmin && currentTab === 'users') currentTab = 'data';
+            }
+
+            function getCurrentUser() {
+                return JSON.parse(localStorage.getItem('userData') || '{}');
+            }
+
+            function isAdminUser() {
+                const u = getCurrentUser();
+                return String(u.role || '').trim().toLowerCase() === 'admin';
+            }
+
             function renderHeaders() {
                 const head = document.getElementById('tableHead');
-                head.innerHTML = `<tr><th style="width:50px;">Edit</th>${allHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                const moneyColumns = new Set(["Treys Payments", "Bills Payments", "Total Costs", "Estimated", "Payments"]);
+                head.innerHTML = `<tr><th style="width:50px;">Edit</th>${allHeaders.map(h => {
+                    if (shouldHideTableColumn(h)) return '';
+                    return `<th class="${moneyColumns.has(h) ? 'money-column' : ''}">${h}</th>`;
+                }).join('')}</tr>`;
             }
 
             function renderTable() {
                 const tbody = document.getElementById('tableBody');
                 const start = (currentPage - 1) * rowsPerPage;
                 const pageData = filteredData.slice(start, start + rowsPerPage);
+                const moneyColumns = new Set(["Treys Payments", "Bills Payments", "Total Costs", "Estimated", "Payments"]);
 
                 tbody.innerHTML = pageData.map(row => {
-                    const cells = allHeaders.map((_, idx) => {
+                    const cells = allHeaders.map((header, idx) => {
+                        if (shouldHideTableColumn(header)) return '';
                         const val = row[idx] ?? '';
-                        if (String(val).startsWith('http')) return `<td><a href="${val}" target="_blank" style="color:var(--primary);font-weight:600;">Link</a></td>`;
-                        return `<td>${val}</td>`;
+                        const className = moneyColumns.has(header) ? ' class="money-column"' : '';
+                        if (String(val).startsWith('http')) return `<td${className}><a href="${val}" target="_blank" style="color:var(--primary);font-weight:600;">Link</a></td>`;
+                        return `<td${className}>${val}</td>`;
                     }).join('');
                     return `<tr><td><button onclick="openEditModal(${row._sheetRow})" style="border:none;background:#f1f5f9;padding:6px;border-radius:6px;cursor:pointer;"><i data-lucide="edit-3" style="width:16px;color:var(--primary);"></i></button></td>${cells}</tr>`;
                 }).join('');
                 renderPagination();
                 lucide.createIcons();
+            }
+
+            function shouldHideTableColumn(header) {
+                return currentTab === 'users' && String(header || '').trim().toLowerCase() === 'password';
             }
 
             function renderPagination() {
@@ -746,7 +849,7 @@ sR2Sh8e3h3Knd6j1tceRIFU=
                 filteredData = allData.filter(r => r.some(c => String(c).toLowerCase().includes(v)));
                 currentPage = 1;
                 renderTable();
-                updateSummary();
+                if (currentTab === 'data') updateSummary();
             }
 
             function parseCurrency(val) {
@@ -766,26 +869,34 @@ sR2Sh8e3h3Knd6j1tceRIFU=
 
             function updateSummary() {
                 const totalItemsList = [
-                    "Plans, Demo, Survey", "Permits", "Trash / Site Maintenace", "Piling/Foundation / Masonary",
+                    "Plans, Demo, Survey", "Permits", "Trash / Site Maintenance", "Trash / Site Maintenace",
+                    "Piling/Foundation / Masonry", "Piling/Foundation / Masonary",
                     "Frame Material & Labor", "Roof & Floor Trusses", "Interior Stairs", "Windows / Sliding Glass Doors",
                     "Electrical", "Lighting Fixtures / Ceiling Fans", "Plumbing", "Plumbing Fixtures, & Tubs",
-                    "HVAC", "Stucco / Siding / Stone veneer", "Insulation", "Soffit and Ceilings", "Roof", "Drywall",
+                    "HVAC", "Stucco / Siding / Stone veneer", "Stucco Exterior & Interior Garage",
+                    "Insulation", "Soffit and Ceilings", "Roof", "Drywall",
                     "Interior Doors & Front Door", "Garage Doors", "Interior / Exterior Paint", "Decks & Railings",
                     "Elevator", "Door Hardware & Closet Shelving", "Trimwork", "Cabinets", "Counter Tops",
                     "Appliances & Fireplace", "Gas Service and Water Heaters", "Tile & Stone", "Shower Doors and Mirrors",
-                    "Wood Floor", "Garage Floor", "Landscape and Sod", "Wall and Gates", "Patio / Driveway",
+                    "Wood Floor", "Garage Floor", "Landscape and Sod", "Wall and Gates", "Wall & Gates", "Patio / Driveway",
                     "Final Clean", "Punchout", "Pool", "Dock", "Misc."
                 ];
 
                 const extraBuildCostItems = [
-                    "Trey", "Lot Purchase Cost", "Taxes", "Utlilties /Insurance"
+                    "Trey", "Lot Purchase Cost", "Taxes", "Utilities /Insurance", "Utilities /Insurance to 8/29/26",
+                    "Utlilties /Insurance"
                 ];
+
+                const normalizeItemName = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                const totalItemsSet = new Set(totalItemsList.map(normalizeItemName));
+                const extraBuildCostSet = new Set(extraBuildCostItems.map(normalizeItemName));
 
                 const cols = {
                     "trey": { label: "Treys Payments", total: 0, extra: 0, elTot: 'tot-trey', elTbc: 'tbc-trey' },
                     "bill": { label: "Bills Payments", total: 0, extra: 0, elTot: 'tot-bill', elTbc: 'tbc-bill' },
                     "cost": { label: "Total Costs", total: 0, extra: 0, elTot: 'tot-cost', elTbc: 'tbc-cost' },
-                    "est": { label: "Estimated", total: 0, extra: 0, elTot: 'tot-est', elTbc: 'tbc-est' }
+                    "est": { label: "Estimated", total: 0, extra: 0, elTot: 'tot-est', elTbc: 'tbc-est' },
+                    "payments": { label: "Payments", total: 0, extra: 0, elTot: 'tot-payments', elTbc: 'tbc-payments' }
                 };
 
                 Object.keys(cols).forEach(k => {
@@ -794,13 +905,13 @@ sR2Sh8e3h3Knd6j1tceRIFU=
                 });
 
                 allData.forEach(row => {
-                    const itemName = String(row[0]).trim();
+                    const itemName = normalizeItemName(row[0]);
                     Object.keys(cols).forEach(k => {
                         if (cols[k].idx === -1) return;
                         const val = parseCurrency(row[cols[k].idx]);
-                        if (totalItemsList.includes(itemName)) {
+                        if (totalItemsSet.has(itemName)) {
                             cols[k].total += val;
-                        } else if (extraBuildCostItems.includes(itemName)) {
+                        } else if (extraBuildCostSet.has(itemName)) {
                             cols[k].extra += val;
                         }
                     });
@@ -813,10 +924,37 @@ sR2Sh8e3h3Knd6j1tceRIFU=
             }
 
             function openEditModal(sheetRow) {
+                if (currentTab === 'users' && !isAdminUser()) {
+                    alert("You do not have permission to edit users.");
+                    return;
+                }
                 editingRowIndex = sheetRow;
                 const row = allData.find(r => r._sheetRow === sheetRow);
-                document.getElementById('editForm').innerHTML = allHeaders.map((h, i) => `
-                    <div class="edit-form-group"><label>${h}</label><input type="text" class="form-input row-input" data-idx="${i}" value="${row[i] ?? ''}"></div>`).join('');
+                document.getElementById('editModalTitle').innerText = 'EDIT DATA';
+                document.getElementById('viewHistoryBtn').style.display = isAdminUser() ? 'inline-block' : 'none';
+                document.getElementById('saveEditBtn').innerText = 'Save changes';
+                document.getElementById('saveEditBtn').onclick = () => saveEdit();
+                document.getElementById('editForm').innerHTML = allHeaders.map((h, i) => {
+                    return `
+                    <div class="edit-form-group"><label>${h}</label><input type="text" class="form-input row-input" data-idx="${i}" value="${row[i] ?? ''}"></div>`;
+                }).join('');
+                document.getElementById('editModal').style.display = 'flex';
+                lucide.createIcons();
+            }
+
+            function openAddUserModal() {
+                if (currentTab !== 'users' || !isAdminUser()) return;
+                editingRowIndex = -1;
+                document.getElementById('editModalTitle').innerText = 'ADD USER';
+                document.getElementById('viewHistoryBtn').style.display = 'none';
+                document.getElementById('rowHistory').style.display = 'none';
+                document.getElementById('saveEditBtn').innerText = 'Add user';
+                document.getElementById('saveEditBtn').onclick = () => saveNewUser();
+                document.getElementById('editForm').innerHTML = allHeaders.map((h, i) => {
+                    const defaultValue = String(h || '').trim().toLowerCase() === 'password' ? '1' : '';
+                    return `
+                    <div class="edit-form-group"><label>${h}</label><input type="text" class="form-input row-input" data-idx="${i}" value="${defaultValue}"></div>`;
+                }).join('');
                 document.getElementById('editModal').style.display = 'flex';
                 lucide.createIcons();
             }
@@ -828,6 +966,14 @@ sR2Sh8e3h3Knd6j1tceRIFU=
             }
 
             async function saveEdit(actionType = 'UPDATE') {
+                if (currentTab === 'users' && !isAdminUser()) {
+                    alert("You do not have permission to edit users.");
+                    return;
+                }
+                if (actionType === 'RESTORE' && !isAdminUser()) {
+                    alert("Only admin can restore old versions.");
+                    return;
+                }
                 const inputs = document.querySelectorAll('.row-input');
                 const newRow = []; inputs.forEach(inp => newRow[parseInt(inp.dataset.idx)] = inp.value);
                 const oldRow = allData.find(r => r._sheetRow === editingRowIndex);
@@ -850,7 +996,37 @@ sR2Sh8e3h3Knd6j1tceRIFU=
                 } catch (e) { alert("Error saving changes."); } finally { document.getElementById('loading').style.display = 'none'; }
             }
 
+            async function saveNewUser() {
+                if (!isAdminUser()) {
+                    alert("You do not have permission to add users.");
+                    return;
+                }
+                const inputs = document.querySelectorAll('.row-input');
+                const newRow = []; inputs.forEach(inp => newRow[parseInt(inp.dataset.idx)] = inp.value);
+                document.getElementById('loading').style.display = 'flex';
+                try {
+                    const token = await getAccessToken();
+                    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.spreadsheetId}/values/users!A:D:append?valueInputOption=USER_ENTERED`, {
+                        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ values: [newRow] })
+                    });
+                    if (!res.ok) throw new Error();
+
+                    const user = JSON.parse(localStorage.getItem('userData') || '{}');
+                    const historyEntry = [new Date().toLocaleString('en-US'), user.id || 'N/A', 'ADD', 'users', '', JSON.stringify([]), JSON.stringify(newRow)];
+                    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.spreadsheetId}/values/history!A:A:append?valueInputOption=USER_ENTERED`, {
+                        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ values: [historyEntry] })
+                    });
+                    alert("Success!"); closeEditModal(); await fetchData();
+                } catch (e) { alert("Error adding user."); } finally { document.getElementById('loading').style.display = 'none'; }
+            }
+
             async function toggleHistory() {
+                if (!isAdminUser()) {
+                    alert("Only admin can view history.");
+                    return;
+                }
                 const el = document.getElementById('rowHistory');
                 if (el.style.display === 'block') { el.style.display = 'none'; return; }
                 el.innerHTML = '<p style="text-align:center;padding:20px;">Loading...</p>'; el.style.display = 'block';
@@ -901,6 +1077,10 @@ sR2Sh8e3h3Knd6j1tceRIFU=
             }
 
             async function restoreState(data) {
+                if (!isAdminUser()) {
+                    alert("Only admin can restore old versions.");
+                    return;
+                }
                 if (!confirm("Restore to this state?")) return;
                 document.querySelectorAll('.row-input').forEach(inp => inp.value = data[parseInt(inp.dataset.idx)] ?? '');
                 await saveEdit('RESTORE');
@@ -914,6 +1094,7 @@ sR2Sh8e3h3Knd6j1tceRIFU=
                     document.getElementById('userRoleDisplay').innerText = u.role || '';
                     document.getElementById('loginOverlay').style.display = 'none';
                     document.getElementById('mainContent').style.display = 'block';
+                    applyUserPermissions();
                     await fetchData();
                 }
             }
@@ -925,7 +1106,7 @@ sR2Sh8e3h3Knd6j1tceRIFU=
                 document.getElementById('loading').style.display = 'flex';
                 try {
                     const token = await getAccessToken();
-                    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.spreadsheetId}/values/ds_nv!A2:D`, { headers: { Authorization: `Bearer ${token}` } });
+                    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.spreadsheetId}/values/users!A2:D`, { headers: { Authorization: `Bearer ${token}` } });
                     const users = (await res.json()).values || [];
                     const found = users.find(u => u[0] === user && u[3] === pass);
                     if (found) {
